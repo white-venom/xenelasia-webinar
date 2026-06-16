@@ -1,0 +1,87 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String         @id @default(uuid())
+  full_name     String
+  email         String         @unique
+  phone         String
+  organization  String
+  password_hash String
+  role          String         @default("USER")
+  created_at    DateTime       @default(now())
+  
+  registrations Registration[]
+  notifications Notification[]
+  certificates  Certificate[]
+}
+
+model Webinar {
+  id          String         @id @default(uuid())
+  title       String
+  description String
+  speaker     String
+  date        DateTime       // Date of the webinar
+  time        String         // Time of the webinar, e.g., "14:00"
+  duration    String         // e.g., "90 mins"
+  seats       Int
+  category    String
+  image       String         // URL of the banner image
+  created_at  DateTime       @default(now())
+  
+  registrations Registration[]
+  certificates  Certificate[]
+}
+
+model Registration {
+  id              String             @id @default(uuid())
+  user_id         String
+  webinar_id      String
+  registration_id String             @unique // Unique code sent to user
+  webinar_pass    String             // Text detail or code
+  qr_code         String             // Base64 or URL of QR Code
+  status          String             @default("REGISTERED")
+  created_at      DateTime           @default(now())
+  
+  user            User               @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  webinar         Webinar            @relation(fields: [webinar_id], references: [id], onDelete: Cascade)
+}
+
+model Blog {
+  id         String   @id @default(uuid())
+  title      String
+  content    String
+  category   String
+  author     String
+  image      String   // URL of header image
+  created_at DateTime @default(now())
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  user_id    String
+  message    String
+  type       String   // e.g., "reminder", "confirmation", "announcement"
+  created_at DateTime @default(now())
+  
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model Certificate {
+  id              String   @id @default(uuid())
+  user_id         String
+  webinar_id      String
+  certificate_url String
+  issued_at       DateTime @default(now())
+  
+  user            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  webinar         Webinar  @relation(fields: [webinar_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, webinar_id])
+}
