@@ -18,8 +18,13 @@ app.use(cors({
     if (process.env.NODE_ENV !== 'production' || !origin) {
       callback(null, true);
     } else {
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-      if (origin === clientUrl || origin === 'http://localhost:3000') {
+      const clientUrl = process.env.CLIENT_URL;
+      if (
+        !clientUrl || 
+        origin === clientUrl || 
+        origin.endsWith('.vercel.app') || 
+        origin === 'http://localhost:3000'
+      ) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
