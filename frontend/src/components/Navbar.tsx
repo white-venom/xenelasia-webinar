@@ -86,8 +86,8 @@ export default function Navbar() {
               ))}
             </div>
 
-            <div className="flex items-center gap-4 border-l border-white/10 pl-6">
-              {user ? (
+            {user && (
+              <div className="flex items-center gap-4 border-l border-white/10 pl-6">
                 <div className="flex items-center gap-4">
                   {user.role === 'ADMIN' ? (
                     <Link
@@ -114,23 +114,8 @@ export default function Navbar() {
                     Logout
                   </button>
                 </div>
-              ) : (
-                <>
-                  <Link
-                    href="/login"
-                    className="text-sm font-semibold text-slate-300 hover:text-white transition-colors"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white hover:from-blue-500 hover:to-purple-500 transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
-                  >
-                    Register Now
-                  </Link>
-                </>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -167,61 +152,42 @@ export default function Navbar() {
                 </Link>
               ))}
 
-              <div className="mt-4 border-t border-white/10 pt-4 px-3 flex flex-col gap-3">
-                {user ? (
-                  <>
-                    <div className="text-sm font-medium text-slate-400">
-                      Signed in as <span className="text-white">{user.full_name}</span>
-                    </div>
-                    {user.role === 'ADMIN' ? (
-                      <Link
-                        href="/admin"
-                        onClick={() => setIsOpen(false)}
-                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 py-2.5 text-sm font-semibold text-purple-300 hover:bg-purple-500/20"
-                      >
-                        <LayoutDashboard className="h-4 w-4" />
-                        Admin Panel
-                      </Link>
-                    ) : (
-                      <Link
-                        href="/dashboard"
-                        onClick={() => setIsOpen(false)}
-                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 py-2.5 text-sm font-semibold text-blue-300 hover:bg-blue-500/20"
-                      >
-                        <LayoutDashboard className="h-4 w-4" />
-                        Dashboard
-                      </Link>
-                    )}
-                    <button
-                      onClick={() => {
-                        setIsOpen(false);
-                        handleLogout();
-                      }}
-                      className="flex w-full items-center justify-center gap-1 rounded-lg border border-red-500/20 bg-red-500/5 py-2.5 text-sm font-semibold text-red-400 hover:bg-red-500/10"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Logout
-                    </button>
-                  </>
-                ) : (
-                  <>
+              {user && (
+                <div className="mt-4 border-t border-white/10 pt-4 px-3 flex flex-col gap-3">
+                  <div className="text-sm font-medium text-slate-400">
+                    Signed in as <span className="text-white">{user.full_name}</span>
+                  </div>
+                  {user.role === 'ADMIN' ? (
                     <Link
-                      href="/login"
+                      href="/admin"
                       onClick={() => setIsOpen(false)}
-                      className="flex w-full items-center justify-center rounded-lg border border-white/10 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-900"
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 py-2.5 text-sm font-semibold text-purple-300 hover:bg-purple-500/20"
                     >
-                      Login
+                      <LayoutDashboard className="h-4 w-4" />
+                      Admin Panel
                     </Link>
+                  ) : (
                     <Link
-                      href="/register"
+                      href="/dashboard"
                       onClick={() => setIsOpen(false)}
-                      className="flex w-full items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 py-2.5 text-sm font-semibold text-white hover:from-blue-500 hover:to-purple-500"
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 py-2.5 text-sm font-semibold text-blue-300 hover:bg-blue-500/20"
                     >
-                      Register Now
+                      <LayoutDashboard className="h-4 w-4" />
+                      Dashboard
                     </Link>
-                  </>
-                )}
-              </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      setIsOpen(false);
+                      handleLogout();
+                    }}
+                    className="flex w-full items-center justify-center gap-1 rounded-lg border border-red-500/20 bg-red-500/5 py-2.5 text-sm font-semibold text-red-400 hover:bg-red-500/10"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
