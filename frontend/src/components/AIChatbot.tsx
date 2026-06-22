@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, X, Send, Bot, Terminal, Sparkles } from 'lucide-react';
-import { chatbotApi } from '../utils/api';
 
 interface Message {
   id: string;
@@ -53,12 +52,12 @@ export default function AIChatbot() {
     setIsLoading(true);
 
     try {
-      // API call to Express backend
-      const response = await chatbotApi.sendMessage(userText);
+      // Mock delay
+      await new Promise(res => setTimeout(res, 1000));
       const botMsg: Message = {
         id: Math.random().toString(),
         sender: 'bot',
-        text: response.reply || 'Sorry, I encountered an issue. Please try again.',
+        text: 'As a static landing page, my interactive AI capabilities are currently offline. Please reach out via the contact form!',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botMsg]);

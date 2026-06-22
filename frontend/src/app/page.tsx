@@ -4,16 +4,16 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Shield, Cpu, Network, Calendar, Clock, User, Users, Search, 
-  Send, ChevronRight, ChevronLeft, Award, Server, MessageSquare, BookOpen, AlertCircle, Mail, Globe
+  Send, ChevronRight, ChevronLeft, Award, Server, MessageSquare, BookOpen, AlertCircle, Mail, Globe,
+  CheckCircle2, X
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), { ssr: false });
 import AIChatbot from '../components/AIChatbot';
-import { webinarApi, blogApi, registrationApi } from '../utils/api';
 
 const MOCK_WEBINARS = [
   {
@@ -199,54 +199,106 @@ export default function LandingPage() {
   // Forms & State
   const [contactForm, setContactForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [contactSuccess, setContactSuccess] = useState(false);
-  const [regStatus, setRegStatus] = useState<{ [key: string]: 'idle' | 'loading' | 'success' | 'error' }>({});
-  const [regErrorMsg, setRegErrorMsg] = useState<{ [key: string]: string }>({});
 
-  // Fetch webinars and blogs
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const webinarData = await webinarApi.getAll();
-        setWebinars(webinarData.length > 0 ? webinarData : MOCK_WEBINARS);
-      } catch (err) {
-        setWebinars(MOCK_WEBINARS);
+  // Registration Modal State
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [registerWebinarId, setRegisterWebinarId] = useState('');
+  const [registerForm, setRegisterForm] = useState({ name: '', email: '', phone: '' });
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
+  const [registerError, setRegisterError] = useState('');
+
+  const openRegisterModal = (webinarId: string) => {
+    setRegisterWebinarId(webinarId);
+    setRegisterForm({ name: '', email: '', phone: '' });
+    setRegisterSuccess(false);
+    setRegisterError('');
+    setIsRegisterOpen(true);
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!registerForm.name || !registerForm.email || !registerForm.phone || !registerWebinarId) return;
+
+    setRegisterLoading(true);
+    setRegisterError('');
+    setRegisterSuccess(false);
+
+    try {
+      const res = await fetch('http://localhost:5000/api/registrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: registerForm.name,
+          email: registerForm.email,
+          phone: registerForm.phone,
+          webinarId: registerWebinarId
+        })
+      });
+
+      if (res.ok) {
+        setRegisterSuccess(true);
+        // Refresh webinars to get updated seat count
+        const refreshRes = await fetch('http://localhost:5000/api/webinars');
+        if (refreshRes.ok) {
+          const freshWebinars = await refreshRes.json();
+          setWebinars(freshWebinars);
+        }
+      } else {
+        const errData = await res.json();
+        setRegisterError(errData.error || 'Failed to complete registration.');
       }
+    } catch (err) {
+      console.error(err);
+      setRegisterError('Failed to connect to backend server. Make sure it is online.');
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
 
+  const selectedWebinarDetails = webinars.find(w => w.id === registerWebinarId);
+
+  useEffect(() => {
+    const fetchWebinars = async () => {
       try {
-        const blogData = await blogApi.getAll();
-        setBlogs(blogData.length > 0 ? blogData : MOCK_BLOGS);
+        const res = await fetch('http://localhost:5000/api/webinars');
+        if (res.ok) {
+          const data = await res.json();
+          setWebinars(data);
+        }
       } catch (err) {
+        console.error("Failed to fetch live webinars from database", err);
+        setWebinars([]);
+      }
+    };
+
+    const fetchBlogs = async () => {
+      try {
+        const categories = ['Cybersecurity', 'Cloud Security', 'Artificial Intelligence', 'Consulting'];
+        const allBlogs = [];
+        
+        for (const cat of categories) {
+          const res = await fetch(`http://localhost:5000/api/blogs?category=${encodeURIComponent(cat)}`);
+          if (res.ok) {
+            const data = await res.json();
+            allBlogs.push(...data);
+          }
+        }
+        
+        if (allBlogs.length === 0) {
+           setBlogs(MOCK_BLOGS);
+        } else {
+           setBlogs(allBlogs);
+        }
+      } catch (err) {
+        console.error("Failed to fetch live blogs", err);
         setBlogs(MOCK_BLOGS);
       }
     };
-    loadData();
+
+    fetchWebinars();
+    fetchBlogs();
   }, []);
-
-  const handleRegister = async (webinarId: string) => {
-    const user = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    
-    if (!user || !token) {
-      router.push('/login?redirect=register&webinar=' + webinarId);
-      return;
-    }
-
-    setRegStatus((prev) => ({ ...prev, [webinarId]: 'loading' }));
-    
-    try {
-      await registrationApi.register(webinarId);
-      setRegStatus((prev) => ({ ...prev, [webinarId]: 'success' }));
-      // Reload webinars to update seats
-      const updated = await webinarApi.getAll();
-      if (updated.length > 0) setWebinars(updated);
-    } catch (err: any) {
-      setRegStatus((prev) => ({ ...prev, [webinarId]: 'error' }));
-      setRegErrorMsg((prev) => ({ ...prev, [webinarId]: err.message || 'Registration failed' }));
-      setTimeout(() => {
-        setRegStatus((prev) => ({ ...prev, [webinarId]: 'idle' }));
-      }, 4000);
-    }
-  };
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -321,15 +373,16 @@ export default function LandingPage() {
       <Navbar />
 
       {/* Hero Section */}
-      <section id="home" className="relative min-h-[92vh] flex items-center justify-center px-4 sm:px-6 lg:px-8 py-20">
-        <div className="mx-auto max-w-5xl text-center flex flex-col items-center">
+      <section id="home" className="relative min-h-[92vh] flex items-center justify-center px-4 sm:px-6 lg:px-8 py-20 overflow-hidden">
+        <div className="mx-auto max-w-4xl text-center flex flex-col items-center justify-center">
+          
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5 }}
             className="flex items-center gap-2 mb-6 border border-neon-blue/20 bg-neon-blue/5 px-4 py-1.5 rounded-full"
           >
-            <Shield className="h-4 w-4 text-neon-blue" />
+            <Shield className="h-4 w-4 text-neon-blue animate-pulse" />
             <span className="text-[11px] font-mono tracking-widest text-neon-blue uppercase">
               Global Strategic Consulting
             </span>
@@ -341,18 +394,37 @@ export default function LandingPage() {
             transition={{ delay: 0.1, duration: 0.6 }}
             className="text-4xl sm:text-6xl font-extrabold text-white tracking-tight leading-tight max-w-4xl"
           >
-            Where <span className="bg-gradient-to-r from-neon-blue to-neon-purple bg-clip-text text-transparent neon-glow-blue">Strategy Meets Execution</span>
+            Where <span className="bg-gradient-to-r from-neon-blue via-neon-purple to-neon-cyan bg-clip-text text-transparent neon-glow-blue">Strategy Meets Execution</span>
           </motion.h1>
 
           <motion.p
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.6 }}
-            className="mt-6 text-base sm:text-lg text-slate-300 max-w-3xl leading-relaxed"
+            className="mt-6 text-base sm:text-lg text-slate-300 max-w-2xl leading-relaxed"
           >
             Xenelasia Group is a global multi-service firm delivering high-impact Virtual CFO services, AI-driven automation, and enterprise-grade consulting purpose-built for ambitious SMBs ready to scale without limits.
           </motion.p>
 
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+            className="mt-8 flex flex-wrap gap-4 justify-center"
+          >
+            <Link
+              href="#webinars"
+              className="rounded-xl bg-gradient-to-r from-neon-blue to-neon-purple px-6 py-3.5 text-xs font-bold text-white hover:opacity-90 transition-all shadow-lg shadow-neon-blue/20 hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              Join Tech Webinars
+            </Link>
+            <Link
+              href="#services"
+              className="rounded-xl border border-white/10 bg-slate-950/60 hover:bg-slate-900 px-6 py-3.5 text-xs font-bold text-slate-300 hover:text-white transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              Explore Services
+            </Link>
+          </motion.div>
 
         </div>
       </section>
@@ -625,89 +697,89 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {webinars.map((webinar) => {
-              const status = regStatus[webinar.id] || 'idle';
-              const dateObj = new Date(webinar.date);
-              
-              return (
-                <div key={webinar.id} className="glass-card rounded-2xl overflow-hidden flex flex-col border border-white/10 hover:border-blue-500/40 transition-all group hover:scale-[1.01]">
-                  
-                  {/* Banner Image */}
-                  <div className="h-48 w-full overflow-hidden relative bg-slate-900">
-                    <img 
-                      src={webinar.image} 
-                      alt={webinar.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute top-4 left-4 rounded-md bg-blue-600 px-2.5 py-1 text-[10px] font-mono text-white tracking-widest uppercase">
-                      {webinar.category}
-                    </div>
-                  </div>
-
-                  {/* Body */}
-                  <div className="p-6 flex-1 flex flex-col">
-                    <h3 className="text-lg font-bold text-white leading-snug group-hover:text-blue-300 transition-colors">
-                      {webinar.title}
-                    </h3>
-                    <p className="mt-2 text-xs text-slate-400 leading-relaxed flex-1 line-clamp-3">
-                      {webinar.description}
-                    </p>
-
-                    <div className="mt-4 pt-4 border-t border-white/5 space-y-2 text-xs text-slate-300">
-                      <div className="flex items-center gap-2">
-                        <User className="h-3.5 w-3.5 text-neon-blue" />
-                        <span>{webinar.speaker}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-3.5 w-3.5 text-neon-purple" />
-                        <span>{dateObj.toDateString()} at {webinar.time}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-3.5 w-3.5 text-neon-cyan" />
-                        <span>Duration: {webinar.duration}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="h-3.5 w-3.5 text-slate-400" />
-                        <span className="flex items-center gap-1.5">
-                          Remaining seats:{' '}
-                          <span className={`font-bold ${webinar.remainingSeats <= 5 ? 'text-red-400 animate-pulse' : 'text-emerald-400'}`}>
-                            {webinar.remainingSeats} / {webinar.seats}
-                          </span>
-                        </span>
+          {webinars.length === 0 ? (
+            <div className="w-full text-center py-16 border border-white/5 bg-slate-950/20 rounded-3xl text-slate-500 flex flex-col items-center justify-center col-span-full">
+              <Calendar className="h-10 w-10 text-slate-700 mb-3" />
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">No Webinars Scheduled</h3>
+              <p className="mt-2 text-xs text-slate-500 max-w-xs leading-relaxed">
+                There are no upcoming security webinars scheduled at this time. Check back later or contact us to request a private session.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full col-span-full">
+              {webinars.map((webinar) => {
+                const dateObj = new Date(webinar.date);
+                
+                return (
+                  <div key={webinar.id} className="glass-card rounded-2xl overflow-hidden flex flex-col border border-white/10 hover:border-blue-500/40 transition-all group hover:scale-[1.01]">
+                    
+                    {/* Banner Image */}
+                    <div className="h-48 w-full overflow-hidden relative bg-slate-900">
+                      <img 
+                        src={webinar.image} 
+                        alt={webinar.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute top-4 left-4 rounded-md bg-blue-600 px-2.5 py-1 text-[10px] font-mono text-white tracking-widest uppercase">
+                        {webinar.category}
                       </div>
                     </div>
 
-                    {/* Registration Error */}
-                    {status === 'error' && (
-                      <div className="mt-3 p-2 bg-red-950/40 border border-red-500/20 rounded-lg flex items-center gap-1.5 text-[10px] text-red-400">
-                        <AlertCircle className="h-3.5 w-3.5" />
-                        <span>{regErrorMsg[webinar.id] || 'Failed'}</span>
-                      </div>
-                    )}
+                    {/* Body */}
+                    <div className="p-6 flex-1 flex flex-col">
+                      <h3 className="text-lg font-bold text-white leading-snug group-hover:text-blue-300 transition-colors">
+                        {webinar.title}
+                      </h3>
+                      <p className="mt-2 text-xs text-slate-400 leading-relaxed flex-1 line-clamp-3">
+                        {webinar.description}
+                      </p>
 
-                    {/* Button */}
-                    <div className="mt-6">
-                      {status === 'success' ? (
-                        <div className="w-full rounded-xl bg-emerald-600/25 border border-emerald-500/30 text-emerald-400 text-center py-2.5 text-xs font-semibold">
-                          Registered Successfully! Check Dashboard
+                      <div className="mt-4 pt-4 border-t border-white/5 space-y-2 text-xs text-slate-300">
+                        <div className="flex items-center gap-2">
+                          <User className="h-3.5 w-3.5 text-neon-blue" />
+                          <span>{webinar.speaker}</span>
                         </div>
-                      ) : (
-                        <button
-                          onClick={() => handleRegister(webinar.id)}
-                          disabled={status === 'loading' || webinar.remainingSeats === 0}
-                          className="w-full rounded-xl bg-slate-900 border border-white/10 hover:border-blue-500/40 py-2.5 text-xs font-semibold text-white hover:bg-blue-600 hover:text-white transition-all cursor-pointer disabled:bg-slate-950 disabled:text-slate-600 disabled:border-slate-800"
-                        >
-                          {status === 'loading' ? 'Processing...' : webinar.remainingSeats === 0 ? 'Fully Booked' : 'Register Now'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-3.5 w-3.5 text-neon-purple" />
+                          <span>{dateObj.toDateString()} at {webinar.time}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5 text-neon-cyan" />
+                          <span>Duration: {webinar.duration}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="h-3.5 w-3.5 text-slate-400" />
+                          <span className="flex items-center gap-1.5">
+                            Remaining seats:{' '}
+                            <span className={`font-bold ${webinar.remainingSeats <= 5 ? 'text-red-400 animate-pulse' : 'text-emerald-400'}`}>
+                              {webinar.remainingSeats} / {webinar.seats}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
 
-                </div>
-              );
-            })}
-          </div>
+                      {/* Button */}
+                      <div className="mt-6">
+                        {webinar.remainingSeats > 0 ? (
+                          <button
+                            onClick={() => openRegisterModal(webinar.id)}
+                            className="w-full text-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 py-2.5 text-xs font-bold text-white hover:opacity-90 transition-all cursor-pointer hover:scale-[1.02] shadow-lg shadow-blue-500/10"
+                          >
+                            Register Now
+                          </button>
+                        ) : (
+                          <div className="w-full text-center rounded-xl bg-slate-900/60 border border-red-500/20 py-2.5 text-xs font-semibold text-red-400">
+                            Sold Out
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
@@ -1013,6 +1085,199 @@ export default function LandingPage() {
 
       <Footer />
       <AIChatbot />
+
+      {/* SECURE WEBINAR REGISTRATION PORTAL */}
+      <AnimatePresence>
+        {isRegisterOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsRegisterOpen(false)}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+            />
+
+            {/* Modal Card */}
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ duration: 0.3 }}
+              className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 shadow-2xl relative w-full max-w-lg overflow-hidden z-10 bg-slate-900/90 text-left"
+            >
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-neon-blue via-neon-purple to-neon-cyan" />
+
+              {/* Close Button */}
+              <button
+                onClick={() => setIsRegisterOpen(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <AnimatePresence mode="wait">
+                {!registerSuccess ? (
+                  /* REGISTRATION FORM */
+                  <motion.div
+                    key="form"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <div className="flex items-center gap-2 mb-6">
+                      <Shield className="h-5 w-5 text-neon-blue animate-pulse" />
+                      <h2 className="text-lg font-bold text-white tracking-tight uppercase">Webinar Registration</h2>
+                    </div>
+
+                    <form onSubmit={handleRegisterSubmit} className="space-y-4 text-xs">
+                      {/* Drop-down Select Webinar */}
+                      <div>
+                        <label className="block font-mono uppercase tracking-widest text-slate-400 mb-1.5">Select Webinar</label>
+                        <select
+                          value={registerWebinarId}
+                          onChange={(e) => {
+                            setRegisterWebinarId(e.target.value);
+                            setRegisterError('');
+                          }}
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-blue focus:ring-1 focus:ring-neon-blue text-white cursor-pointer text-xs"
+                          required
+                        >
+                          <option value="" disabled>-- Choose a Webinar --</option>
+                          {webinars.map((w) => (
+                            <option key={w.id} value={w.id} disabled={w.remainingSeats <= 0}>
+                              {w.title} {w.remainingSeats <= 0 ? '(Sold Out)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Selected Webinar Card Preview */}
+                      {selectedWebinarDetails && (
+                        <div className="bg-slate-950/60 border border-white/5 rounded-2xl p-4 space-y-1.5">
+                          <h4 className="font-bold text-white text-xs text-neon-blue-light">{selectedWebinarDetails.title}</h4>
+                          <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 text-[10px] text-slate-400 pt-1.5 border-t border-white/5">
+                            <div><span className="text-slate-600 uppercase font-mono tracking-wider">Expert:</span> {selectedWebinarDetails.speaker}</div>
+                            <div><span className="text-slate-600 uppercase font-mono tracking-wider">Seats:</span> {selectedWebinarDetails.remainingSeats} left</div>
+                            <div><span className="text-slate-600 uppercase font-mono tracking-wider">Date:</span> {new Date(selectedWebinarDetails.date).toDateString()}</div>
+                            <div><span className="text-slate-600 uppercase font-mono tracking-wider">Time:</span> {selectedWebinarDetails.time}</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Full Name */}
+                      <div>
+                        <label className="block font-mono uppercase tracking-widest text-slate-400 mb-1.5">Full Name</label>
+                        <input
+                          type="text"
+                          value={registerForm.name}
+                          onChange={(e) => setRegisterForm(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="John Doe"
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-blue focus:ring-1 focus:ring-neon-blue text-white"
+                          required
+                          disabled={registerLoading}
+                        />
+                      </div>
+
+                      {/* Email ID */}
+                      <div>
+                        <label className="block font-mono uppercase tracking-widest text-slate-400 mb-1.5">Email Address</label>
+                        <input
+                          type="email"
+                          value={registerForm.email}
+                          onChange={(e) => setRegisterForm(prev => ({ ...prev, email: e.target.value }))}
+                          placeholder="john@company.com"
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-blue focus:ring-1 focus:ring-neon-blue text-white"
+                          required
+                          disabled={registerLoading}
+                        />
+                      </div>
+
+                      {/* Contact Number */}
+                      <div>
+                        <label className="block font-mono uppercase tracking-widest text-slate-400 mb-1.5">Contact Number</label>
+                        <input
+                          type="tel"
+                          value={registerForm.phone}
+                          onChange={(e) => setRegisterForm(prev => ({ ...prev, phone: e.target.value }))}
+                          placeholder="+1 (555) 019-2834"
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-neon-blue focus:ring-1 focus:ring-neon-blue text-white"
+                          required
+                          disabled={registerLoading}
+                        />
+                      </div>
+
+                      {registerError && (
+                        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/5 border border-red-500/10 rounded-xl p-3">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
+                          <span>{registerError}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsRegisterOpen(false)}
+                          className="w-1/3 rounded-xl border border-white/10 bg-transparent py-3 hover:bg-white/5 transition-all text-center text-slate-300 font-semibold"
+                          disabled={registerLoading}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={registerLoading}
+                          className="w-2/3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 py-3 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-blue-500/10 hover:scale-[1.01]"
+                        >
+                          {registerLoading ? (
+                            <>
+                              <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-3.5 w-3.5" />
+                              Register Securely
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                ) : (
+                  /* REGISTRATION SUCCESS VIEW */
+                  <motion.div
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex flex-col items-center text-center py-6"
+                  >
+                    <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-6 shadow-[0_0_15px_rgba(16,185,129,0.15)] animate-bounce">
+                      <CheckCircle2 className="h-8 w-8" />
+                    </div>
+
+                    <h3 className="text-lg font-bold text-white uppercase tracking-wider">Registration Confirmed</h3>
+                    <p className="mt-3 text-xs text-slate-300 max-w-sm leading-relaxed">
+                      Congratulations! You have successfully registered for <span className="text-neon-blue font-bold">"{selectedWebinarDetails?.title}"</span>.
+                    </p>
+                    <p className="mt-2 text-[11px] text-emerald-400/90 font-medium">
+                      An automatic confirmation email has been sent to <strong>{registerForm.email}</strong> with your seminar schedule details.
+                    </p>
+
+                    <button
+                      onClick={() => setIsRegisterOpen(false)}
+                      className="mt-8 px-8 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white transition-all cursor-pointer hover:scale-105 active:scale-95"
+                    >
+                      Close Window
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
