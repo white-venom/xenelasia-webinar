@@ -15,6 +15,8 @@ import Footer from '../components/Footer';
 const ThreeBackground = dynamic(() => import('../components/ThreeBackground'), { ssr: false });
 import AIChatbot from '../components/AIChatbot';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 const MOCK_WEBINARS = [
   {
     id: '1',
@@ -225,7 +227,7 @@ export default function LandingPage() {
     setRegisterSuccess(false);
 
     try {
-      const res = await fetch('http://localhost:5000/api/registrations', {
+      const res = await fetch(`${API_BASE_URL}/api/registrations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -239,7 +241,7 @@ export default function LandingPage() {
       if (res.ok) {
         setRegisterSuccess(true);
         // Refresh webinars to get updated seat count
-        const refreshRes = await fetch('http://localhost:5000/api/webinars');
+        const refreshRes = await fetch(`${API_BASE_URL}/api/webinars`);
         if (refreshRes.ok) {
           const freshWebinars = await refreshRes.json();
           setWebinars(freshWebinars);
@@ -261,7 +263,7 @@ export default function LandingPage() {
   useEffect(() => {
     const fetchWebinars = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/webinars');
+        const res = await fetch(`${API_BASE_URL}/api/webinars`);
         if (res.ok) {
           const data = await res.json();
           setWebinars(data);
@@ -278,7 +280,7 @@ export default function LandingPage() {
         const allBlogs = [];
         
         for (const cat of categories) {
-          const res = await fetch(`http://localhost:5000/api/blogs?category=${encodeURIComponent(cat)}`);
+          const res = await fetch(`${API_BASE_URL}/api/blogs?category=${encodeURIComponent(cat)}`);
           if (res.ok) {
             const data = await res.json();
             allBlogs.push(...data);

@@ -8,6 +8,8 @@ import {
   Lock, LogIn, Plus, Trash2, ArrowLeft, CheckCircle2, AlertCircle, Sparkles, Image as ImageIcon
 } from 'lucide-react';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 const PRESET_IMAGES: Record<string, string> = {
   'Cybersecurity': 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=600',
   'Cloud Security': 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=600',
@@ -70,7 +72,7 @@ export default function AdminPage() {
   const fetchWebinars = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/webinars');
+      const res = await fetch(`${API_BASE_URL}/api/webinars`);
       if (res.ok) {
         const data = await res.json();
         setWebinars(data);
@@ -119,7 +121,7 @@ export default function AdminPage() {
     setFormSuccess(false);
 
     try {
-      const res = await fetch('http://localhost:5000/api/webinars', {
+      const res = await fetch(`${API_BASE_URL}/api/webinars`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -160,7 +162,7 @@ export default function AdminPage() {
     if (!confirm('Are you sure you want to delete this webinar?')) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/webinars/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/webinars/${id}`, {
         method: 'DELETE'
       });
 
